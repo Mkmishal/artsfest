@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Judge Duty Schedule</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css"></link>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=Roboto:wght@300;400;500&display=swap');
+
+        @page {
+            size: A4;
+            margin: 0;
+        }
+     
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #f8f9fa;
+            margin: 0;
+        }
+
+body {
+      font-family: Arial, sans-serif;
+      display: flex;
+      margin: 20px;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+    }
+    .search-box {
+      margin-bottom: 20px;
+    }
+    .search-box input {
+      width: 100%;
+      padding: 8px 12px;
+      font-size: 1em;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+    }
+    .schedule-list {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+    .schedule-item {
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      padding: 12px 16px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+      background: #fff;
+    }
+    .schedule-header {
+      display: flex;
+      justify-content: space-between;
+      font-weight: bold;
+      margin-bottom: 6px;
+    }
+    .schedule-header-left {
+      color: #333;
+    }
+    .schedule-header-right {
+      color: #666;
+      font-size: 0.9em;
+    }
+    .schedule-concept,
+    .schedule-topic {
+      margin: 4px 0;
+      color: #444;
+    }
+    .schedule-topic {
+      font-style: italic;
+      color: #555;
+    }
+    </style>
+</head>
+<body>
+
+<h2>Program Concept and topic table</h2>
+
+
+  <!-- Search box -->
+<div class="search-box">
+<input type="text" id="searchInput" placeholder="Search by code, program, category, or topic...">
+</div>
+
+<div id="scheduleList" class="schedule-list"></div>
+
+
+
+
+    <script>
+        const SHEET_ID = "1FJXCkz2KaP71OZqUnnx6Xbm1DAfpeO7iWfQ3GUMBU78";
+        const makeGvizUrl = (sheetName) =>
+            `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent('PROGRAMS')}&tqx=out:json`;
+        function loadGvizSheet(sheetName) {
+            return new Promise((resolve, reject) => {
+                window.google = window.google || {};
+                window.google.visualization = window.google.visualization || {};
+                window.google.visualization.Query = window.google.visualization.Query || {};
+                const originalSetResponse = window.google.visualization.Query.setResponse;
+                const cleanup = () => {
+                    window.google.visualization.Query.setResponse = originalSetResponse || function () {};
+                };
+                const timeout = setTimeout(() => {
+                    cleanup();
+                    reject(new Error(`Timeout loading sheet: ${sheetName}`));
+                }, 15000);
+                window.google.visualization.Query.setResponse = function (response) {
+                    try {
+                        clearTimeout(timeout);
+                        cleanup();
+                        if (!response || !response.table) {
+                            throw new Error("No table in response");
+                        }
+                        resolve(response);
+                    } catch (err) {
+                        clearTimeout(timeout);
+                        cleanup();
+                        reject(err);
+                    }
+                };
+                const script = document.createElement("script");
+                script.src = makeGvizUrl(sheetName);
+                script.async = true;
+                script.onerror = () => {
+                    clearTimeout(timeout);
+                    cleanup();
+                    reject(new Error(`Failed to load sheet script for "${sheetName}"`));
+                };
+                document.body.appendChild(script);
+            });
+        }
+        function parseJavaScriptDate(dateString) {
+            if (typeof dateString !== 'string') return null;
+            
+            // Try to extract date components from various formats
+            const dateMatch = dateString.match(/Date\(([^)]+)\)/);
+            if (dateMatch) {
+                const parts = dateMatch[1].split(',');
+                if (parts.length >= 3) {
+                    const year = parseInt(parts[0]);
+                    const month = parseInt(parts[1]); // 0-11
+                    const day = parseInt(parts[2]);
+                    return new Date(day, month, year);
+                }
+            }
+            
+            // Fallback: try direct parsing
+            return new Date(dateString);
+        }
+
+
+
+        function parseJavaScriptDateTime(dateTimeString) {
+            if (typeof dateTimeString !== 'string') return null;
+            
+            // Try to extract date and time components
+            const dateTimeMatch = dateTimeString.match(/Date\(([^)]+)\)/);
+            if (dateTimeMatch) {
+                const parts = dateTimeMatch[1].split(',');
+                if (parts.length >= 6) {
+                    const year = parseInt(parts[0]);
+                    const month = parseInt(parts[1]); // 0-11
+                    const day = parseInt(parts[2]);
+                    const hour = parseInt(parts[3]);
+                    const minute = parseInt(parts[4]);
+                    const second = parseInt(parts[5]);
+                    return new Date(year, month, day, hour, minute, second);
+                }
+            }
+            
+            // Fallback: try direct parsing
+            return new Date(dateTimeString);
+        }
+
+
+
+        function formatDate(dateObj) {
+            if (!(dateObj instanceof Date) || isNaN(dateObj.getTime())) return '';
+            return dateObj.toLocaleDateString('en-GB', { day: "2-digit", month: "2-digit", year: "2-digit" }); // DD/MM/YY format
+        }
+
+
+        function formatTime(timeObj) {
+            if (!(timeObj instanceof Date) || isNaN(timeObj.getTime())) return '';
+            return timeObj.toLocaleTimeString('en-US', { 
+                hour: 'numeric', 
+                minute: '2-digit',
+                hour12: true // AM/PM format
+            });
+        }
+
+
+
+        function parseScheduleResponse(response) {
+            const headers = (response.table.cols || []).map(c => (c.label || '').toLowerCase());
+            const rawRows = response.table.rows || [];
+            console.log(headers);
+            console.log(rawRows);
+            return rawRows.map(r => {
+                const cells = r.c || [];
+                const get = key => {
+                    const idx = headers.indexOf(key);
+                    if (idx === -1) return '';
+                    const cell = cells[idx];
+                    return cell ? (cell.v ?? '') : '';
+                };
+                
+                let dateValue = get('date');
+                let startValue = get('start');
+                let endValue = get('end');
+                
+                // Parse date values
+                if (dateValue) {
+                    dateValue = parseJavaScriptDate(dateValue);
+                }
+                
+                if (startValue) {
+                    startValue = parseJavaScriptDateTime(startValue);
+                }
+                
+                if (endValue) {
+                    endValue = parseJavaScriptDateTime(endValue);
+                }
+                
+                return {
+                    code: get('code'),
+                    program: get('name'),
+                    category: get('category'),
+                    mode: get('mode'),
+                    concept: get('concept'),
+                    topic: get('topic'),
+                };
+            }); // Only include entries with a judge
+        }
+
+
+
+
+document.addEventListener('DOMContentLoaded', async () => {
+    try {
+        const scheduleResponse = await loadGvizSheet('PROGRAMS');
+        const scheduleData = parseScheduleResponse(scheduleResponse);
+        console.log(scheduleData);
+      
+const list = document.getElementById("scheduleList");
+const searchInput = document.getElementById("searchInput");
+                
+function renderList(data) {
+      list.innerHTML = "";
+      data.forEach(item => {
+        const html = `
+          <div class="schedule-item">
+            <div class="schedule-header">
+              <div class="schedule-header-left">${item.code} - ${item.program}</div>
+              <div class="schedule-header-right">${item.category} | ${item.mode}</div>
+            </div>
+            <div class="schedule-concept">${item.concept}</div>
+            <div class="schedule-topic">${item.topic}</div>
+          </div>
+        `;
+        list.insertAdjacentHTML("beforeend", html);
+      });
+    }
+
+    // Initial render
+    renderList(scheduleData);
+
+    // Filter on input
+    searchInput.addEventListener("input", () => {
+      const query = searchInput.value.toLowerCase();
+      const filtered = scheduleData.filter(item =>
+        item.code.toLowerCase().includes(query) ||
+        item.program.toLowerCase().includes(query) ||
+        item.category.toLowerCase().includes(query) ||
+        item.mode.toLowerCase().includes(query) ||
+        item.concept.toLowerCase().includes(query) ||
+        item.topic.toLowerCase().includes(query)
+      );
+      renderList(filtered);
+    });
+              
+    
+
+
+
+
+
+            // error handler
+            } catch (error) {
+                console.error('Error loading schedule data:', error);
+                alert('Failed to load schedule data. Please check the sheet ID and sharing settings.');
+            }
+        });
+
+    </script>
+</body>
+</html>
