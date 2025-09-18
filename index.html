@@ -231,6 +231,7 @@ body {
                     mode: get('mode'),
                     concept: get('concept'),
                     topic: get('topic'),
+                    rubrics: get('rubrics'),
                 };
             }); // Only include entries with a judge
         }
@@ -257,8 +258,9 @@ function renderList(data) {
               <div class="schedule-header-right">${item.category} | ${item.mode}</div>
             </div>
             <div class="schedule-concept">${item.concept}</div>
-            <h3>Topic:</h3>
+            <h3>Topic</h3>
             <div class="schedule-topic">${item.topic}</div>
+            <h4>Rubrics: ${item.rubrics}</h4>
           </div>
         `;
         list.insertAdjacentHTML("beforeend", html);
@@ -282,12 +284,6 @@ function renderList(data) {
       renderList(filtered);
     });
               
-    
-
-
-
-
-
             // error handler
             } catch (error) {
                 console.error('Error loading schedule data:', error);
@@ -298,5 +294,3 @@ function renderList(data) {
     </script>
 </body>
 </html>
-
-
