@@ -23,15 +23,52 @@ body {
     flex-direction: column;
     gap: 20px;
 }
-.search-box {
-    margin-bottom: 20px;
+/* Container for inputs and labels */
+.filter-container {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
 }
-.search-box input {
-    width: 100%;
-    padding: 8px 12px;
-    font-size: 1em;
-    border: 1px solid #ccc;
-    border-radius: 6px;
+
+/* Label styling */
+.filter-container label {
+  font-weight: 500;
+  font-size: 14px;
+  color: #333;
+  margin-right: 6px;
+  white-space: nowrap;
+}
+
+/* Common style for input and select */
+.filter-container select,
+.filter-container input[type="text"] {
+  padding: 10px 14px;
+  font-size: 16px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  outline: none;
+  transition: all 0.2s ease-in-out;
+  min-width: 180px;
+}
+
+/* Focus effect */
+.filter-container select:focus,
+.filter-container input[type="text"]:focus {
+  border-color: #4a90e2;
+  box-shadow: 0 0 5px rgba(74, 144, 226, 0.5);
+}
+
+/* Hover effect for select */
+.filter-container select:hover {
+  border-color: #4a90e2;
+}
+
+/* Placeholder style for input */
+.filter-container input::placeholder {
+  color: #aaa;
+  font-style: italic;
 }
 .schedule-list {
   display: flex;
@@ -67,15 +104,7 @@ body {
   font-style: italic;
   color: #555;
 }
-    /* Container styling */
-
 .container {
-    display: flex;
-    margin: 30px;
-    flex-direction: column;
-    align-items: left;
-}
-.conceptnotehead {
     display: flex;
     margin: 30px;
     flex-direction: column;
@@ -170,7 +199,6 @@ h3 {
   font-weight: 600;
   box-shadow: 0 2px 6px rgba(0,0,0,0.2) inset;
 }
-
 /* Wrap tables in a responsive container */
 .table-container {
   width: 100%;
@@ -193,13 +221,19 @@ h3 {
 
 
 <div id="conceptnotepage" style="display: block;">
-    <div class="conceptnotehead">
-        <h4>(If any errors please refresh the page)</h4>
+    <div class="container">
+      <h4>(If any errors, Please refresh the page)</h4>
         <h1>PROGRAM CONCEPTS AND TOPICS WITH RUBRICS</h1>
         <!-- Search box -->
+         <div class="filter-container">
+          <label for="categoryFilter">Filter by Category: </label>
+            <select id="categoryFilter1">
+              <option value="all">All</option>
+            </select>
             <div class="search-box">
                 <input type="text" id="conceptsearchInput" placeholder="Search by code, program, category, or topic...">
             </div>
+          </div>
         <div id="scheduleList" class="schedule-list"></div>
     </div>
     
@@ -207,10 +241,16 @@ h3 {
 
 <div id="schedulepage" style="display: none;">
     <div class="container">
-        <h1 id="main-heading">SCHEDULE</h1>
+      <h1 id="main-heading">SCHEDULE</h1>
+        <div class="filter-container">
+            <label for="categoryFilter">Filter by Category: </label>
+            <select id="categoryFilter2" onchange="filterTable()">
+              <option value="all">All</option>
+            </select>
             <div class="search-box">
-                <input type="text" id="schedulesearchInput" placeholder="Search by code, program, category, or topic...">
+                <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="Search by code, program, category, or topic...">
             </div>
+        </div>
         <div id="schedule"></div>
     </div>
 </div>
@@ -338,6 +378,37 @@ const schedulepage = document.getElementById("schedulepage");
         function parseScheduleResponse1(response) {
             const headers = (response.table.cols || []).map(c => (c.label || '').toLowerCase());
             const rawRows = response.table.rows || [];
+
+
+//new 
+  // Find which column index is "category"
+  const categoryIndex = headers.indexOf("category");
+  if (categoryIndex === -1) {
+    console.error("No 'category' column found!");
+    return;
+  }
+
+  // Collect unique categories
+  const categories = new Set();
+  rawRows.forEach(row => {
+    if (row.c && row.c[categoryIndex]) {
+      categories.add(row.c[categoryIndex].v.trim());
+    }
+  });
+
+  // Fill the dropdown
+  const categoryFilter = document.getElementById("categoryFilter1");
+  categoryFilter.innerHTML = `<option value="all">All</option>`; // reset first
+  categories.forEach(cat => {
+    const option = document.createElement("option");
+    option.value = cat.toLowerCase();
+    option.textContent = cat;
+    categoryFilter.appendChild(option);
+  });
+
+
+
+
             return rawRows.map(r => {
                 const cells = r.c || [];
                 const get = key => {
@@ -382,45 +453,57 @@ document.addEventListener('DOMContentLoaded', async () => {
         const scheduleResponse = await loadGvizSheet1('PROGRAMS');
         const scheduleData = parseScheduleResponse1(scheduleResponse);
       
-const list = document.getElementById("scheduleList");
-const searchInput = document.getElementById("conceptsearchInput");
-                
-function renderList(data) {
-      list.innerHTML = "";
-      data.forEach(item => {
-        const html = `
-          <div class="schedule-item">
-            <div class="schedule-header">
-              <div class="schedule-header-left">${item.code} - ${item.program}</div>
-              <div class="schedule-header-right">${item.category} | ${item.mode}</div>
-            </div>
-            <div class="schedule-concept">${item.concept}</div>
-            <h4>Topic</h4>
-            <div class="schedule-topic">${item.topic}</div>
-            <h4>Rubrics: ${item.rubrics}</h4>
-          </div>
-        `;
-        list.insertAdjacentHTML("beforeend", html);
-      });
-    }
+        const list = document.getElementById("scheduleList");
+        const searchInput = document.getElementById("conceptsearchInput");
+                        
+        function renderList(data) {
+              list.innerHTML = "";
+              data.forEach(item => {
+                const html = `
+                  <div class="schedule-item">
+                    <div class="schedule-header">
+                      <div class="schedule-header-left">${item.code} - ${item.program}</div>
+                      <div class="schedule-header-right">${item.category} | ${item.mode}</div>
+                    </div>
+                    <div class="schedule-concept">${item.concept}</div>
+                    <h4>Topic</h4>
+                    <div class="schedule-topic">${item.topic}</div>
+                    <h4>Rubrics: ${item.rubrics}</h4>
+                  </div>
+                `;
+                list.insertAdjacentHTML("beforeend", html);
+              });
+            }
 
-    // Initial render
     renderList(scheduleData);
 
     // Filter on input
-    searchInput.addEventListener("input", () => {
-      const query = searchInput.value.toLowerCase();
-      const filtered = scheduleData.filter(item =>
-        item.code.toLowerCase().includes(query) ||
-        item.program.toLowerCase().includes(query) ||
-        item.category.toLowerCase().includes(query) ||
-        item.mode.toLowerCase().includes(query) ||
-        item.concept.toLowerCase().includes(query) ||
-        item.topic.toLowerCase().includes(query)
-      );
-      renderList(filtered);
-    });
-              
+        function applyFilters() {
+          const filterValue = document.getElementById("categoryFilter1").value.toLowerCase();
+          const query = document.getElementById("conceptsearchInput").value.toLowerCase();
+
+          const filtered = scheduleData.filter(item => {
+            const categoryMatch = filterValue === "all" || item.category.toLowerCase() === filterValue;
+
+            const searchMatch = !query || 
+              item.code.toLowerCase().includes(query) ||
+              item.program.toLowerCase().includes(query) ||
+              item.category.toLowerCase().includes(query) ||
+              item.mode.toLowerCase().includes(query) ||
+              item.concept.toLowerCase().includes(query) ||
+              item.topic.toLowerCase().includes(query);
+
+            return categoryMatch && searchMatch; // AND logic
+          });
+
+          renderList(filtered);
+        }
+
+// Attach event listeners to BOTH inputs
+document.getElementById("conceptsearchInput").addEventListener("input", applyFilters);
+document.getElementById("categoryFilter1").addEventListener("change", applyFilters);
+
+
             // error handler
             } catch (error) {
                 console.error('Error loading schedule data:', error);
@@ -582,6 +665,37 @@ function formatSheetDateVerbose(value) {
             const headers = (response.table.cols || []).map(c => (c.label || '').toLowerCase());
             const rawRows = response.table.rows || [];
             
+
+//new 
+  // Find which column index is "category"
+  const categoryIndex = headers.indexOf("category");
+  if (categoryIndex === -1) {
+    console.error("No 'category' column found!");
+    return;
+  }
+
+  // Collect unique categories
+  const categories = new Set();
+  rawRows.forEach(row => {
+    if (row.c && row.c[categoryIndex]) {
+      categories.add(row.c[categoryIndex].v.trim());
+    }
+  });
+
+  // Fill the dropdown
+  const categoryFilter = document.getElementById("categoryFilter2");
+  categoryFilter.innerHTML = `<option value="all">All</option>`; // reset first
+  categories.forEach(cat => {
+    const option = document.createElement("option");
+    option.value = cat.toLowerCase();
+    option.textContent = cat;
+    categoryFilter.appendChild(option);
+  });
+
+
+
+
+
             return rawRows.map(r => {
                 const cells = r.c || [];
                 const get = key => {
@@ -679,9 +793,6 @@ function printSheet(id) {
                 // console.log(Object.keys(window.dates).length);
             
                 const container = document.getElementById('schedule');
-
-                const table = document.createElement('table');
-                    table.className = 'schedule-table';
                     
                     const thead = document.createElement('thead');
                     const headerRow = document.createElement('tr');
@@ -703,6 +814,7 @@ function printSheet(id) {
       container.appendChild(title);
 
       const table = document.createElement("table");
+      table.className = "scheduletable";
 
       // Table header (skip 'date' column)
       const headerRow = document.createElement("tr");
@@ -730,51 +842,44 @@ function printSheet(id) {
 
       container.appendChild(table);
     }
-
-
-
-
-schedulesearchInput.addEventListener('input', function() {
-  const filter = this.value.toLowerCase();
-  
-  // Get all tables
-  const tables = document.querySelectorAll('#schedule table');
-  
-  tables.forEach(table => {
-    const rows = table.querySelectorAll('tbody tr, tr'); // all rows
-    
-    let anyRowVisible = false; // check if table has any matching row
-    
-    rows.forEach((row, index) => {
-      // Skip header row
-      if (row.querySelectorAll('th').length > 0) return;
-      
-      const text = row.textContent.toLowerCase();
-      if (text.includes(filter)) {
-        row.style.display = '';
-        anyRowVisible = true;
-      } else {
-        row.style.display = 'none';
-      }
-    });
-    
-    // Hide table if no rows match
-    table.style.display = anyRowVisible ? '' : 'none';
-    
-    // Optional: hide table title (h3) if table hidden
-    if (table.previousElementSibling && table.previousElementSibling.tagName === 'H3') {
-      table.previousElementSibling.style.display = anyRowVisible ? '' : 'none';
-    }
-  });
-});
-
             } catch (error) {
                 console.error('Error loading schedule data:', error);
                 alert('Failed to load schedule data. Please check the sheet ID and sharing settings.');
             }
         });
 
+
+function filterTable() {
+  const filterValue = document.getElementById("categoryFilter2").value.toLowerCase();
+  const searchValue = document.getElementById("searchInput").value.toLowerCase();
+  const tables = document.getElementsByClassName("scheduletable");
+
+  for (let t = 0; t < tables.length; t++) {
+    const trs = tables[t].getElementsByTagName("tr");
+
+    for (let i = 1; i < trs.length; i++) { // skip header
+      const tds = trs[i].getElementsByTagName("td");
+
+      // Get the category column (e.g., column 5)
+      const category = tds[5].textContent.toLowerCase();
+      const categoryMatch = (filterValue === "all" || category === filterValue);
+
+      // Check if searchValue exists in ANY column of this row
+      let searchMatch = false;
+      for (let j = 0; j < tds.length; j++) {
+        if (tds[j].textContent.toLowerCase().includes(searchValue)) {
+          searchMatch = true;
+          break;
+        }
+      }
+
+      // Show/hide the row based on both filters
+      trs[i].style.display = (categoryMatch && searchMatch) ? "" : "none";
+    }
+  }
+}
+
+
     </script>
 </body>
 </html>
-
